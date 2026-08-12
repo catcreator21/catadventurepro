@@ -26,6 +26,25 @@ button:hover{transform:translateY(-2px)}button:active{transform:translateY(2px);
 #freeMenu input::placeholder{opacity:.6}
 #buildPanel button{display:block;width:100%;margin:5px 0;padding:8px}
 #freeMenu .card{max-height:90vh;overflow:auto}
+
+body{touch-action:none;-webkit-user-select:none;user-select:none}
+#touchUI{display:none;position:fixed;inset:0;z-index:15;pointer-events:none}
+#touchHint{position:fixed;bottom:14px;left:50%;transform:translateX(-50%);background:#111827bb;padding:8px 13px;border-radius:12px;font-size:12px;white-space:nowrap}
+.touchZone{position:absolute;bottom:0;height:45%;pointer-events:auto}
+#moveZone{left:0;width:55%}
+#jumpZone{right:0;width:45%}
+#touchStick{position:absolute;width:86px;height:86px;border:3px solid #ffffff88;border-radius:50%;left:45px;bottom:55px;display:none;background:#ffffff12}
+#touchStickKnob{position:absolute;width:38px;height:38px;border-radius:50%;background:#ffffff77;left:21px;top:21px}
+#touchJump{position:absolute;right:42px;bottom:55px;width:88px;height:88px;border-radius:50%;border:3px solid #ffffff88;background:#ffffff18;display:flex;align-items:center;justify-content:center;font-size:30px}
+@media (pointer:coarse), (max-width:900px){
+  #touchUI{display:block}
+  #controls{display:none!important}
+  #hud{top:8px}
+  .hudbox{padding:7px 10px}
+  #leftHud{max-width:65vw;font-size:12px}
+  #rightHud .hudbox{font-size:12px}
+  #rightHud button{padding:7px}
+}
 </style>
 </head>
 <body>
@@ -103,6 +122,16 @@ button:hover{transform:translateY(-2px)}button:active{transform:translateY(2px);
   <button id="hideControls" style="padding:6px 9px;margin:7px 0 0">Hide</button>
 </div>
 <div id="toast"></div>
+<div id="touchUI">
+  <div id="moveZone" class="touchZone">
+    <div id="touchStick"><div id="touchStickKnob"></div></div>
+  </div>
+  <div id="jumpZone" class="touchZone">
+    <div id="touchJump">⬆️</div>
+  </div>
+  <div id="touchHint">Swipe/drag on the left to move • Tap the right side to jump</div>
+</div>
+
 
 <script>
 const canvas=document.getElementById("game"),ctx=canvas.getContext("2d");
@@ -111,6 +140,61 @@ function resize(){W=innerWidth;H=innerHeight;DPR=Math.min(devicePixelRatio||1,2)
 addEventListener("resize",resize);resize();
 
 const keys=Object.create(null);let jumpPressed=false;
+
+// Universal touchscreen controls:
+// - Drag/swipe on the left side to move.
+// - Tap the right side to jump.
+// - A finger can stay on the left while another finger taps the right.
+// - Works for phones, tablets, iPads and touchscreen computers.
+const touchState={leftId:null,leftX:0,leftY:0};
+const moveZone=document.getElementById("moveZone"),jumpZone=document.getElementById("jumpZone");
+// Pointer fallback for touchscreen computers.
+let pointerLeft=null,pointerStartX=0;
+moveZone.addEventListener("pointerdown",e=>{
+ if(e.pointerType==="touch"||e.pointerType==="pen"){pointerLeft=e.pointerId;pointerStartX=e.clientX;stick.style.display="block";stick.style.left=Math.max(18,e.clientX-43)+"px";e.preventDefault()}
+});
+moveZone.addEventListener("pointermove",e=>{
+ if(e.pointerId===pointerLeft){setTouchMove(e.clientX-pointerStartX);e.preventDefault()}
+});
+function pointerEnd(e){if(e.pointerId===pointerLeft){pointerLeft=null;keys.a=false;keys.d=false;stick.style.display="none";knob.style.transform="translateX(0)";e.preventDefault()}}
+moveZone.addEventListener("pointerup",pointerEnd);moveZone.addEventListener("pointercancel",pointerEnd);
+jumpZone.addEventListener("pointerdown",e=>{if(e.pointerType==="touch"||e.pointerType==="pen"){jumpPressed=true;e.preventDefault()}});
+
+const stick=document.getElementById("touchStick"),knob=document.getElementById("touchStickKnob");
+function setTouchMove(dx){
+  const max=70, nx=Math.max(-max,Math.min(max,dx));
+  if(Math.abs(nx)<12){keys.a=false;keys.d=false}
+  else if(nx<0){keys.a=true;keys.d=false}
+  else{keys.d=true;keys.a=false}
+  knob.style.transform=`translateX(${nx}px)`;
+}
+moveZone.addEventListener("touchstart",e=>{
+  for(const t of e.changedTouches){
+    if(touchState.leftId===null){
+      touchState.leftId=t.identifier;touchState.leftX=t.clientX;touchState.leftY=t.clientY;
+      stick.style.display="block";stick.style.left=Math.max(18,t.clientX-43)+"px";stick.style.bottom=Math.max(45,H-t.clientY-43)+"px";
+      e.preventDefault();break;
+    }
+  }
+},{passive:false});
+moveZone.addEventListener("touchmove",e=>{
+  for(const t of e.changedTouches)if(t.identifier===touchState.leftId){
+    setTouchMove(t.clientX-touchState.leftX);e.preventDefault();break;
+  }
+},{passive:false});
+function endMove(e){
+  for(const t of e.changedTouches)if(t.identifier===touchState.leftId){
+    touchState.leftId=null;keys.a=false;keys.d=false;stick.style.display="none";knob.style.transform="translateX(0)";e.preventDefault();break;
+  }
+}
+moveZone.addEventListener("touchend",endMove,{passive:false});
+moveZone.addEventListener("touchcancel",endMove,{passive:false});
+
+function jumpTouch(e){jumpPressed=true;e.preventDefault()}
+jumpZone.addEventListener("touchstart",jumpTouch,{passive:false});
+jumpZone.addEventListener("touchend",e=>e.preventDefault(),{passive:false});
+jumpZone.addEventListener("touchcancel",e=>e.preventDefault(),{passive:false});
+
 addEventListener("keydown",e=>{
  const k=e.key.toLowerCase();
  if([" ","arrowup","arrowdown","arrowleft","arrowright"].includes(k))e.preventDefault();
