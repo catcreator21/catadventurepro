@@ -84,6 +84,15 @@ body{touch-action:none;-webkit-user-select:none;user-select:none}
   <button data-build="bench">🪑 Bench</button>
   <p class="small">Click the world to place it.</p>
 </div>
+
+<div id="completeMenu" style="position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:linear-gradient(135deg,#07111dcc,#273a5dcc);backdrop-filter:blur(8px);z-index:40">
+  <div class="card">
+    <div class="title">🏆 Adventure Complete!</div>
+    <p class="subtitle">You caught every fish and finished the adventure!</p>
+    <button class="primary" id="finishFreePlay">🌐 Enter Online Free Play</button>
+    <button id="finishMenu">Main Menu</button>
+  </div>
+</div>
 <div id="menu">
   <div class="card">
     <div class="title">🐱 Cat Explorer</div>
@@ -91,7 +100,7 @@ body{touch-action:none;-webkit-user-select:none;user-select:none}
     <div class="stats"><div class="stat"><b>30</b><span class="small">Adventure levels</span></div><div class="stat"><b>∞</b><span class="small">Infinite mode</span></div><div class="stat"><b>🎨</b><span class="small">Cat colors</span></div></div>
     <div>
       <button class="primary" id="adventureBtn">▶ Adventure Mode</button>
-      <button class="secondary" id="infiniteBtn">♾ Infinite Mode</button><button id="freeBtn" class="secondary">🏡 Free Play</button>
+      <button class="secondary" id="infiniteBtn">♾ Infinite Mode</button><button id="freeBtn" class="secondary" disabled>🔒 Free Play</button>
     </div>
     <p class="small">WASD / Arrow Keys to move • Space to jump</p>
   </div>
@@ -442,7 +451,16 @@ function update(){
  }
  if(fish.every(f=>f.got)&&!portal.active){portal.active=true;updateHud();toast("✨ All fish caught! The portal is open!")}
  if(portal.active&&Math.hypot(cat.x-portal.x,cat.y-portal.y)<75){
-   if(cat.x>portal.x-50){levelIndex++;if(mode==="adventure"&&levelIndex>=FINITE_LEVELS){localStorage.setItem("catAdventureFinished","yes");mode="menu";document.getElementById("hud").style.display="none";document.getElementById("menu").style.display="flex";toast("🏆 Adventure complete!");}
+   if(cat.x>portal.x-50){levelIndex++;if(mode==="adventure"&&levelIndex>=FINITE_LEVELS){
+  localStorage.setItem("catAdventureFinished","yes");
+  mode="menu";
+  document.getElementById("hud").style.display="none";
+  document.getElementById("menu").style.display="none";
+  document.getElementById("freeBtn").disabled=false;
+  document.getElementById("freeBtn").textContent="🏡 Free Play";
+  document.getElementById("completeMenu").style.display="flex";
+  refreshFreeButton();
+}
    else loadLevel();}
  }
  camX+=(Math.max(0,cat.x-W*.35)-camX)*.12;
@@ -556,36 +574,59 @@ const color1=document.getElementById("color"),color2=document.getElementById("co
 color1.addEventListener("input",()=>{color2.value=color1.value});
 color2.addEventListener("input",()=>{color1.value=color2.value});
 </script>
-</body>
-</html>
-document.getElementById("freeBtn").onclick=()=>{if(adventureFinished())openFreeMenu();else alert("Finish Adventure Mode first to unlock Free Play!");};
-document.getElementById("backMain").onclick=closeFreeMenu;
+
+<script>
+function refreshFreeButton(){
+  const b=document.getElementById("freeBtn");
+  const unlocked=adventureFinished();
+  b.disabled=!unlocked;
+  b.textContent=unlocked?"🏡 Free Play":"🔒 Finish Adventure First";
+}
+function showMainMenu(){
+  document.getElementById("completeMenu").style.display="none";
+  document.getElementById("freeMenu").style.display="none";
+  document.getElementById("freeHud").style.display="none";
+  document.getElementById("menu").style.display="flex";
+  refreshFreeButton();
+}
+document.getElementById("freeBtn").onclick=()=>{
+  if(adventureFinished()) openFreeMenu();
+  else toast("🏆 Finish Adventure Mode first to unlock Free Play!");
+};
+document.getElementById("finishFreePlay").onclick=()=>{
+  document.getElementById("completeMenu").style.display="none";
+  openFreeMenu();
+};
+document.getElementById("finishMenu").onclick=showMainMenu;
+document.getElementById("backMain").onclick=showMainMenu;
 document.getElementById("soloFreePlay").onclick=()=>startFreePlay();
 document.getElementById("createRoom").onclick=()=>connectRoom("00000");
 document.getElementById("joinRoom").onclick=()=>connectRoom(document.getElementById("roomCode").value.trim());
 document.getElementById("leaveFree").onclick=()=>{
- freePlay=false;mode="menu";if(freeSocket)freeSocket.close();
- document.getElementById("freeHud").style.display="none";document.getElementById("buildPanel").style.display="none";document.getElementById("menu").style.display="flex";
+  freePlay=false; mode="menu";
+  if(freeSocket) freeSocket.close();
+  document.getElementById("freeHud").style.display="none";
+  document.getElementById("buildPanel").style.display="none";
+  document.getElementById("menu").style.display="flex";
+  refreshFreeButton();
 };
-document.getElementById("buildBtn").onclick=()=>document.getElementById("buildPanel").style.display=document.getElementById("buildPanel").style.display==="none"?"block":"none";
-document.querySelectorAll("[data-build]").forEach(b=>b.onclick=()=>{buildMode=b.dataset.build;document.getElementById("buildPanel").style.display="none";toast("Click the ground to place your "+buildMode)});
-canvas.addEventListener("click",e=>{
- if(mode!=="free"||!buildMode)return;
- const rect=canvas.getBoundingClientRect(),x=e.clientX-rect.left,y=e.clientY-rect.top;
- if(y>250){placeTownObject(buildMode,x,y);buildMode=null}
+document.getElementById("buildBtn").onclick=()=>{
+  const panel=document.getElementById("buildPanel");
+  panel.style.display=panel.style.display==="none"?"block":"none";
+};
+document.querySelectorAll("[data-build]").forEach(b=>b.onclick=()=>{
+  buildMode=b.dataset.build;
+  document.getElementById("buildPanel").style.display="none";
+  toast("Click/tap the ground to place your "+buildMode);
 });
-
-<script>
-const gc1=document.getElementById("glitterColor"),gc2=document.getElementById("glitterColor2");
-function setGlitterColor(v){glitterColor=v;gc1.value=v;gc2.value=v}
-gc1.addEventListener("input",e=>setGlitterColor(e.target.value));
-gc2.addEventListener("input",e=>setGlitterColor(e.target.value));
-function toggleGlitter(){
- glitterEnabled=!glitterEnabled;
- document.getElementById("glitterBtn").textContent=glitterEnabled?"✨ Glitter ON":"✨ Glitter";
- document.getElementById("glitterToggle2").textContent=glitterEnabled?"✨ Glitter: ON":"✨ Glitter: OFF";
- if(glitterEnabled)toast("✨ Glitter enabled!");
-}
-document.getElementById("glitterBtn").onclick=toggleGlitter;
-document.getElementById("glitterToggle2").onclick=toggleGlitter;
+canvas.addEventListener("click",e=>{
+  if(mode!=="free"||!buildMode)return;
+  const rect=canvas.getBoundingClientRect();
+  const x=e.clientX-rect.left,y=e.clientY-rect.top;
+  if(y>250){placeTownObject(buildMode,x,y);buildMode=null}
+});
+refreshFreeButton();
 </script>
+
+</body>
+</html>
