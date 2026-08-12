@@ -35,8 +35,9 @@ body{touch-action:none;-webkit-user-select:none;user-select:none}
 #jumpZone{right:0;width:45%}
 #touchStick{position:absolute;width:86px;height:86px;border:3px solid #ffffff88;border-radius:50%;left:45px;bottom:55px;display:none;background:#ffffff12}
 #touchStickKnob{position:absolute;width:38px;height:38px;border-radius:50%;background:#ffffff77;left:21px;top:21px}
-#touchJump{position:absolute;right:42px;bottom:55px;width:88px;height:88px;border-radius:50%;border:3px solid #ffffff88;background:#ffffff18;display:flex;align-items:center;justify-content:center;font-size:30px}
+#touchJump{position:absolute;right:24px;bottom:35px;width:150px;height:150px;border-radius:50%;border:4px solid #ffffffaa;background:#ffffff2b;display:flex;align-items:center;justify-content:center;font-size:52px;box-shadow:0 8px 30px #0005;pointer-events:auto;touch-action:none}
 @media (pointer:coarse), (max-width:900px){
+  #touchJump{width:170px;height:170px;right:20px;bottom:25px;font-size:58px}
   #touchUI{display:block}
   #controls{display:none!important}
   #hud{top:8px}
@@ -45,6 +46,8 @@ body{touch-action:none;-webkit-user-select:none;user-select:none}
   #rightHud .hudbox{font-size:12px}
   #rightHud button{padding:7px}
 }
+
+.glitterSpark{position:fixed;pointer-events:none;width:7px;height:7px;border-radius:50%;z-index:9;box-shadow:0 0 12px currentColor}
 </style>
 </head>
 <body>
@@ -109,12 +112,17 @@ body{touch-action:none;-webkit-user-select:none;user-select:none}
   </div>
   <div id="rightHud">
     <div class="hudbox">🎨 <input id="color" type="color" value="#f28c28"></div>
+    <div class="hudbox">✨ <input id="glitterColor" type="color" value="#ffffff" title="Glitter color"></div>
+    <button class="hudbox" id="glitterBtn" title="Toggle glitter">✨ Glitter</button>
     <button class="hudbox" id="controlsBtn">Controls</button>
     <button class="hudbox" id="pauseBtn">Ⅱ</button>
   </div>
 </div>
 
 <div id="controls">
+  <b>✨ Cat Glitter</b><br>
+  <input id="glitterColor2" type="color" value="#ffffff" aria-label="Choose glitter color" style="width:100%;height:48px;margin:8px 0;cursor:pointer;pointer-events:auto">
+  <button id="glitterToggle2" style="padding:8px 12px">✨ Glitter: OFF</button><br><br>
   <b>🎨 Cat Color</b><br><input id="color2" type="color" value="#f28c28" aria-label="Choose cat color" style="width:100%;height:48px;margin:8px 0;cursor:pointer;pointer-events:auto"><br><b>🐱 Controls</b><br>
   W A S D / Arrow Keys — move<br>
   Space — jump<br>
@@ -127,7 +135,7 @@ body{touch-action:none;-webkit-user-select:none;user-select:none}
     <div id="touchStick"><div id="touchStickKnob"></div></div>
   </div>
   <div id="jumpZone" class="touchZone">
-    <div id="touchJump">⬆️</div>
+    <div id="touchJump">⬆️<span style="position:absolute;bottom:25px;font-size:17px;font-weight:900;letter-spacing:.5px">JUMP</span></div>
   </div>
   <div id="touchHint">Swipe/drag on the left to move • Tap the right side to jump</div>
 </div>
@@ -364,6 +372,50 @@ function togglePause(){
 function spawn(x,y,n=8){
  for(let i=0;i<n;i++){const a=Math.random()*Math.PI*2,s=1+Math.random()*3;particles.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s-2,life:.6+Math.random()*.5})}
 }
+
+let glitterEnabled=false;
+let glitterColor="#ffffff";
+let glitterParticles=[];
+let glitterTimer=0;
+
+function glitterBurst(x,y,n=3){
+  if(!glitterEnabled)return;
+  for(let i=0;i<n;i++){
+    glitterParticles.push({
+      x:x+(Math.random()-.5)*42,y:y+(Math.random()-.5)*45,
+      vx:(Math.random()-.5)*1.7,vy:-.4-Math.random()*1.8,
+      life:.45+Math.random()*.7,size:2+Math.random()*4,
+      color:glitterColor,spin:Math.random()*6
+    });
+  }
+}
+function updateGlitter(){
+  if(!glitterEnabled)return;
+  glitterTimer-=.016;
+  if(glitterTimer<=0){
+    glitterBurst((freePlay?freeCat.x:cat.x),(freePlay?freeCat.y:cat.y),2);
+    glitterTimer=.045;
+  }
+  for(const g of glitterParticles){
+    g.x+=g.vx;g.y+=g.vy;g.vy+=.025;g.life-=.016;g.spin+=.25;
+  }
+  glitterParticles=glitterParticles.filter(g=>g.life>0);
+}
+function drawGlitter(){
+  if(!glitterEnabled)return;
+  ctx.save();
+  for(const g of glitterParticles){
+    ctx.globalAlpha=Math.max(0,g.life/.8);
+    ctx.fillStyle=g.color;
+    ctx.shadowColor=g.color;ctx.shadowBlur=10;
+    ctx.translate(g.x-(freePlay?0:camX),g.y);
+    ctx.rotate(g.spin);
+    ctx.beginPath();ctx.moveTo(0,-g.size*2.3);ctx.lineTo(g.size*.8,0);ctx.lineTo(0,g.size*2.3);ctx.lineTo(-g.size*.8,0);ctx.closePath();ctx.fill();
+    ctx.setTransform(DPR,0,0,DPR,0,0);
+  }
+  ctx.restore();ctx.globalAlpha=1;ctx.shadowBlur=0;
+}
+
 function update(){
  if(mode==="free"){updateFree();return;}
  if(mode!=="adventure"&&mode!=="infinite")return;
@@ -491,7 +543,7 @@ function draw(){
  drawBackground(L);drawWorld(L);drawCat();
  for(const p of particles){ctx.fillStyle=L.theme.accent;ctx.globalAlpha=Math.max(0,p.life);ctx.fillRect(p.x-camX,p.y,5,5)}ctx.globalAlpha=1;ctx.restore();
 }
-function loop(){update();draw();requestAnimationFrame(loop)}loop();
+function loop(){update();updateGlitter();draw();drawGlitter();requestAnimationFrame(loop)}loop();
 
 document.getElementById("adventureBtn").onclick=()=>startGame("adventure");
 document.getElementById("infiniteBtn").onclick=()=>startGame("infinite");
@@ -522,3 +574,18 @@ canvas.addEventListener("click",e=>{
  const rect=canvas.getBoundingClientRect(),x=e.clientX-rect.left,y=e.clientY-rect.top;
  if(y>250){placeTownObject(buildMode,x,y);buildMode=null}
 });
+
+<script>
+const gc1=document.getElementById("glitterColor"),gc2=document.getElementById("glitterColor2");
+function setGlitterColor(v){glitterColor=v;gc1.value=v;gc2.value=v}
+gc1.addEventListener("input",e=>setGlitterColor(e.target.value));
+gc2.addEventListener("input",e=>setGlitterColor(e.target.value));
+function toggleGlitter(){
+ glitterEnabled=!glitterEnabled;
+ document.getElementById("glitterBtn").textContent=glitterEnabled?"✨ Glitter ON":"✨ Glitter";
+ document.getElementById("glitterToggle2").textContent=glitterEnabled?"✨ Glitter: ON":"✨ Glitter: OFF";
+ if(glitterEnabled)toast("✨ Glitter enabled!");
+}
+document.getElementById("glitterBtn").onclick=toggleGlitter;
+document.getElementById("glitterToggle2").onclick=toggleGlitter;
+</script>
